@@ -114,8 +114,8 @@ function modelDraftsFromProvider(provider: ProviderConfig): ModelDraft[] {
     outputCost: toNumberText(model.cost?.output),
     cacheReadCost: toNumberText(model.cost?.cache_read),
     cacheWriteCost: toNumberText(model.cost?.cache_write),
-    attachment: model.attachment === true || model.modalities?.input.includes("image") === true,
-    imageInput: model.modalities?.input.includes("image") === true,
+    attachment: model.attachment === true || model.modalities?.input?.includes("image") === true,
+    imageInput: model.modalities?.input?.includes("image") === true,
     reasoning: model.reasoning === true,
     temperature: model.temperature === true,
     toolCall: model.tool_call !== false,
@@ -215,13 +215,12 @@ function buildModelConfig(model: ModelDraft) {
     if (model.imageInput) {
       inputModalities.add("text");
       inputModalities.add("image");
-      outputModalities.add("text");
     } else {
       inputModalities.delete("image");
     }
     next.modalities = {
       input: Array.from(inputModalities),
-      output: Array.from(outputModalities),
+      output: model.imageInput ? ["text"] : Array.from(outputModalities),
     };
   } else {
     delete next.modalities;
