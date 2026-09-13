@@ -10,6 +10,9 @@ import { cn } from "@/lib/utils";
 import type { OpencodeConfig, ProviderConfig } from "@/types";
 import { Check, Plus, Save, Trash } from "@nsmr/pixelart-react";
 
+const INPUT_MODALITIES = ["text", "image", "audio", "video", "pdf"] as const;
+type InputModality = (typeof INPUT_MODALITIES)[number];
+
 interface ModelDraft {
   source?: NonNullable<ProviderConfig["models"]>[string];
   key: string;
@@ -23,7 +26,7 @@ interface ModelDraft {
   cacheReadCost: string;
   cacheWriteCost: string;
   attachment: boolean;
-  imageInput: boolean;
+  inputModalities: string[];
   reasoning: boolean;
   temperature: boolean;
   toolCall: boolean;
@@ -66,7 +69,7 @@ function emptyModel(key = "model-id"): ModelDraft {
     cacheReadCost: "",
     cacheWriteCost: "",
     attachment: false,
-    imageInput: false,
+    inputModalities: ["text"],
     reasoning: false,
     temperature: false,
     toolCall: true,
@@ -114,8 +117,9 @@ function modelDraftsFromProvider(provider: ProviderConfig): ModelDraft[] {
     outputCost: toNumberText(model.cost?.output),
     cacheReadCost: toNumberText(model.cost?.cache_read),
     cacheWriteCost: toNumberText(model.cost?.cache_write),
-    attachment: model.attachment === true || model.modalities?.input?.includes("image") === true,
-    imageInput: model.modalities?.input?.includes("image") === true,
+    attachment:
+      model.attachment === true || model.modalities?.input?.some((modality) => modality !== "text") === true,
+    inputModalities: model.modalities?.input ? [...model.modalities.input] : ["text"],
     reasoning: model.reasoning === true,
     temperature: model.temperature === true,
     toolCall: model.tool_call !== false,
@@ -206,21 +210,16 @@ function buildModelConfig(model: ModelDraft) {
     delete next.cost;
   }
 
-  if (model.attachment || model.imageInput) next.attachment = true;
+  const hasAttachmentInput = model.inputModalities.some((modality) => modality !== "text");
+  if (model.attachment || hasAttachmentInput) next.attachment = true;
   else delete next.attachment;
 
-  if (model.source?.modalities || model.imageInput) {
-    const inputModalities = new Set(model.source?.modalities?.input || []);
-    const outputModalities = new Set(model.source?.modalities?.output || []);
-    if (model.imageInput) {
-      inputModalities.add("text");
-      inputModalities.add("image");
-    } else {
-      inputModalities.delete("image");
-    }
+  const hasExplicitInputModalities =
+    model.inputModalities.length !== 1 || model.inputModalities[0] !== "text";
+  if (model.source?.modalities || hasExplicitInputModalities) {
     next.modalities = {
-      input: Array.from(inputModalities),
-      output: model.imageInput ? ["text"] : Array.from(outputModalities),
+      input: [...model.inputModalities],
+      output: hasAttachmentInput ? ["text"] : [...(model.source?.modalities?.output || [])],
     };
   } else {
     delete next.modalities;
@@ -740,23 +739,13 @@ export function CustomProviderModelEditor({ config, onSave }: CustomProviderMode
                             onCheckedChange={(checked) =>
                               updateModel(providerIndex, modelIndex, {
                                 attachment: checked,
-                                imageInput: checked ? model.imageInput : false,
+                                inputModalities: checked
+                                  ? model.inputModalities
+                                  : model.inputModalities.filter((modality) => modality === "text"),
                               })
                             }
                           />
                           {t("attachment")}
-                        </label>
-                        <label className="flex items-center gap-2 text-sm">
-                          <Switch
-                            checked={model.imageInput}
-                            onCheckedChange={(checked) =>
-                              updateModel(providerIndex, modelIndex, {
-                                imageInput: checked,
-                                attachment: checked ? true : model.attachment,
-                              })
-                            }
-                          />
-                          {t("imageInput")}
                         </label>
                         <label className="flex items-center gap-2 text-sm">
                           <Switch
@@ -786,6 +775,29 @@ export function CustomProviderModelEditor({ config, onSave }: CustomProviderMode
                           />
                           {t("experimental")}
                         </label>
+                      </div>
+
+                      <div className="mt-3 space-y-2 rounded-md bg-muted/30 p-3">
+                        <Label>{t("inputModalities")}</Label>
+                        <div className="flex flex-wrap gap-4">
+                          {INPUT_MODALITIES.map((modality) => (
+                            <label key={modality} className="flex items-center gap-2 text-sm">
+                              <Switch
+                                checked={model.inputModalities.includes(modality)}
+                                onCheckedChange={(checked) => {
+                                  const inputModalities = checked
+                                    ? [...new Set([...model.inputModalities, modality])]
+                                    : model.inputModalities.filter((value) => value !== modality);
+                                  updateModel(providerIndex, modelIndex, {
+                                    inputModalities,
+                                    attachment: checked && modality !== "text" ? true : model.attachment,
+                                  });
+                                }}
+                              />
+                              {t(`modality.${modality}` as `modality.${InputModality}`)}
+                            </label>
+                          ))}
+                        </div>
                       </div>
                     </div>
                     )

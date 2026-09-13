@@ -271,7 +271,14 @@
       "cacheReadCost": "Cache Read Cost",
       "cacheWriteCost": "Cache Write Cost",
       "attachment": "Attachments",
-      "imageInput": "Vision (image input)",
+      "inputModalities": "Input modalities",
+      "modality": {
+        "text": "Text",
+        "image": "Image",
+        "audio": "Audio",
+        "video": "Video",
+        "pdf": "PDF"
+      },
       "reasoning": "Reasoning",
       "temperature": "Temperature",
       "toolCall": "Tool Calls",
